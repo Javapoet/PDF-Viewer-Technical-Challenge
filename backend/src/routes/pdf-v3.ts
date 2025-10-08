@@ -9,19 +9,32 @@ import { parseRange } from '../utils/range.js';
 import { PDFDocument } from 'pdf-lib';
 
 /*
- * Create a Least Recently Used (LRU) cache
+ * Create a Least Recently Used (LRU) cache for stor
  */
 let srcBytesCache: { etag: string; buf: Buffer } | null = null; // Full doc bytes (per ETag)
 let srcDocCache: { etag: string; doc: PDFDocument } | null = null; // Parsed PDFDocument (per ETag)
 
-// Tiny LRU for one-page PDFs
-class LRU<V> {
+/*
+ * A simple Least Recently Used cache for individual pages
+ */
+class LeastRecentlyUsedCache<V> {
     private map = new Map<string, V>();
     constructor(private max = 64) {}
-    get(k: string) { const v = this.map.get(k); if (v !== undefined) { this.map.delete(k); this.map.set(k, v); } return v; }
-    set(k: string, v: V) { if (this.map.has(k)) this.map.delete(k); this.map.set(k, v); if (this.map.size > this.max) this.map.delete(this.map.keys().next().value); }
+    get(k: string) {
+        const v = this.map.get(k);
+        if (v !== undefined) {
+            this.map.delete(k);
+            this.map.set(k, v);
+        }
+        return v;
+    }
+    set(k: string, v: V) {
+        if (this.map.has(k)) this.map.delete(k);
+        this.map.set(k, v);
+        if (this.map.size > this.max) this.map.delete(this.map.keys().next().value);
+    }
 }
-const pageCache = new LRU<Buffer>(64);
+const pageCache = new LeastRecentlyUsedCache<Buffer>(64);
 const inflightPages = new Map<string, Promise<Buffer>>(); // De-dup in-flight page builds
 
 const __filename = fileURLToPath(import.meta.url);
@@ -244,7 +257,15 @@ router.get('/page/:n', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
 
     const ifNoneMatch = req.headers['if-none-match'];
-    if (ifNoneMatch && ifNoneMatch === pageEtag) return res.status(304).end();
+    //if (ifNoneMatch && ifNoneMatch === pageEtag) {
+    if (ifNoneMatch) {
+        console.log('ifNoneMatch = ', ifNoneMatch);
+        console.log('pageEtag    = ', pageEtag);
+        if (ifNoneMatch === pageEtag) {
+            console.info('Return HTTP Status Code 304.');
+            return res.status(304).end();
+        }
+    }
 
     try {
         const buf = await buildSinglePagePdf(n);
