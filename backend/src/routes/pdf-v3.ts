@@ -57,17 +57,6 @@ console.log('routes/pdf.ts: pdfInfo = ', pdfInfo);
 
 //const pageCache = new Map<string, Buffer>();
 
-/*
-export async function initPdfInfo() {
-    console.log('routes/pdf-v3.initPdfInfo()');
-
-    const stat = fs.statSync(pdfInfo.filePath);
-    pdfInfo.fileSize = stat.size;
-    //pdfInfo.lastModified = stat.mtimeMs;
-    //pdfInfo.etag = await computeEtag(pdfInfo.filePath);
-    await ensurePageCount();
-}
-*/
 export async function initPdfInfo() {
     console.log('routes/pdf-v3.initPdfInfo()');
 
@@ -103,7 +92,7 @@ async function buildSinglePagePdf(n: number): Promise<Buffer> {
     const key = `${pdfInfo.etag}|${n}`;
     console.log('key = ', key);
     const cached = pageCache.get(key);
-    console.log('cached = ', cached);
+    console.log('cached = ', cached ? cached.length : cached);
     if (cached) {
         console.info('Return the cached page from the `pageCache`.');
         return cached;
@@ -118,12 +107,12 @@ async function buildSinglePagePdf(n: number): Promise<Buffer> {
         console.log('srcDoc = ', typeof srcDoc);
         const outDoc = await PDFDocument.create();
         console.log('outDoc = ', typeof outDoc);
-        const [copied] = await outDoc.copyPages(srcDoc, [n - 1]);
+        const [ copied ] = await outDoc.copyPages(srcDoc, [n - 1]);
         outDoc.addPage(copied);
         const outBytes = await outDoc.save({ useObjectStreams: true });
         console.log('outBytes = ', outBytes.length);
         const buf = Buffer.from(outBytes);
-        console.log('buf = ', buf);
+        //console.log('buf = ', buf);
         pageCache.set(key, buf);
         return buf;
     })();
@@ -206,23 +195,25 @@ async function ensurePageCount(): Promise<number | null> {
 }
 
 router.get('/info', async (_req, res) => {
-    console.log('routes/pdf-v3.ts: router.get(\'/info\', (_req, res)');
+    //console.log('routes/pdf-v3.ts: router.get(\'/info\', (_req, res)');
+    console.log('routes/pdf-v3.info(_req, res)');
 
     if (!fs.existsSync(pdfInfo.filePath)) return res.status(404).json({ error: 'PDF not found' });
     
-    await ensurePageCount();
+    //await ensurePageCount();
 
     return res.json({
         fileName: pdfInfo.fileName,
         fileSize: pdfInfo.fileSize,
-        //lastModified: pdfInfo.lastModified,
-        //etag: pdfInfo.etag,
+        lastModified: pdfInfo.lastModified,
+        etag: pdfInfo.etag,
         pageCount: pdfInfo.pageCount,
     });
 });
 
 router.get('/page/:n', async (req, res) => {
-    console.log('routes/pdf-v3.ts: router.get(\'/page/:n\', (_req, res)');
+    //console.log('routes/pdf-v3.ts: router.get(\'/page/:n\', (_req, res)');
+    console.log('routes/pdf-v3.page(_req, res)', req.params.n);
 
     if (!fs.existsSync(pdfInfo.filePath)) return res.status(404).json({ error: 'PDF not found' });
 
@@ -257,7 +248,7 @@ router.get('/page/:n', async (req, res) => {
 
     try {
         const buf = await buildSinglePagePdf(n);
-        console.log('buf = ', buf);
+        console.log('buf.length = ', buf.length);
         res.setHeader('Content-Length', String(buf.length));
         return res.end(buf);
     } catch (err) {
