@@ -67,57 +67,57 @@ export default function PdfViewer({ info, loadingInfo }: Props) {
         try { if (docRef.current) await docRef.current.destroy() } catch {}
 
         try {
-          let loadingTask: any
-          const cached = cacheRef.current.get(target)
-          if (cached) {
-            loadingTask = pdfjsLib.getDocument({ data: cached.data, disableRange: true, disableStream: true })
-          } else {
-            const url = `/api/pdf/page/${target}?v=${encodeURIComponent(version)}`
-            loadingTask = pdfjsLib.getDocument({ url, disableRange: true, disableStream: true })
-          }
+            let loadingTask: any
+            const cached = cacheRef.current.get(target)
+            if (cached) {
+                loadingTask = pdfjsLib.getDocument({ data: cached.data, disableRange: true, disableStream: true })
+            } else {
+                const url = `/api/pdf/page/${target}?v=${encodeURIComponent(version)}`
+                loadingTask = pdfjsLib.getDocument({ url, disableRange: true, disableStream: true })
+            }
 
-          const pdfDoc = await loadingTask.promise
-          if (myReq !== reqIdRef.current) return
-          docRef.current = pdfDoc
+            const pdfDoc = await loadingTask.promise
+            if (myReq !== reqIdRef.current) return
+            docRef.current = pdfDoc
 
-          const pdfPage = await pdfDoc.getPage(1)
-          const scale = 1.5
-          const viewport = pdfPage.getViewport({ scale })
-          setDim({ w: viewport.width, h: viewport.height })
+            const pdfPage = await pdfDoc.getPage(1)
+            const scale = 1.5
+            const viewport = pdfPage.getViewport({ scale })
+            setDim({ w: viewport.width, h: viewport.height })
 
-          const canvas = canvasRef.current!
-          const ctx = canvas.getContext('2d')!
-          canvas.width = viewport.width
-          canvas.height = viewport.height
+            const canvas = canvasRef.current!
+            const ctx = canvas.getContext('2d')!
+            canvas.width = viewport.width
+            canvas.height = viewport.height
 
-          await pdfPage.render({ canvasContext: ctx, viewport }).promise
-          if (myReq !== reqIdRef.current) return
-          setPage(target)
+            await pdfPage.render({ canvasContext: ctx, viewport }).promise
+            if (myReq !== reqIdRef.current) return
+            setPage(target)
 
-          void prefetch(target + 1)
+            void prefetch(target + 1)
         } catch (e: any) {
-          if (myReq !== reqIdRef.current) return
-          setError(e?.message || 'Failed to render page')
+            if (myReq !== reqIdRef.current) return
+            setError(e?.message || 'Failed to render page')
         } finally {
-          if (myReq === reqIdRef.current) setIsRendering(false)
+            if (myReq === reqIdRef.current) setIsRendering(false)
         }
     }
 
     React.useEffect(() => {
-      if (!loadingInfo && info?.pageCount) {
-        void loadAndRender(1)
-      }
-      return () => { try { if (docRef.current) docRef.current.destroy() } catch {} }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+        if (!loadingInfo && info?.pageCount) void loadAndRender(1)
+      
+        return () => { try { if (docRef.current) docRef.current.destroy() } catch {} }
+    
     }, [loadingInfo])
 
     React.useEffect(() => {
         function onKey(e: KeyboardEvent) {
-          if (!info) return
-          if (e.key === 'ArrowRight') void loadAndRender(page + 1)
-          if (e.key === 'ArrowLeft') void loadAndRender(page - 1)
-          if (e.key === 'Home') void loadAndRender(1)
-          if (e.key === 'End') void loadAndRender(total)
+            if (!info) return
+            if (e.key === 'ArrowRight') void loadAndRender(page + 1)
+            if (e.key === 'ArrowLeft') void loadAndRender(page - 1)
+            if (e.key === 'Home') void loadAndRender(1)
+            if (e.key === 'End') void loadAndRender(total)
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
@@ -128,35 +128,38 @@ export default function PdfViewer({ info, loadingInfo }: Props) {
     return (
         <div className="viewer">
             <div className="toolbar">
-              <button onClick={() => loadAndRender(1)} disabled={disabled || page === 1}>⏮ First</button>
-              <button onClick={() => loadAndRender(page - 1)} disabled={disabled || page <= 1}>◀ Prev</button>
-              <span>Page&nbsp;</span>
-              <input
-                type="number" min={1} max={total || 1}
-                value={page}
-                onChange={(e) => {
-                  const v = Number(e.target.value || 1)
-                  const t = clamped(v)
-                  if (t !== page) void loadAndRender(t)
-                }}
-              />
-              <span>&nbsp;/ {total || '—'}</span>
-              <button onClick={() => loadAndRender(page + 1)} disabled={disabled || page >= total}>Next ▶</button>
-              <button onClick={() => loadAndRender(total)} disabled={disabled || page === total}>Last ⏭</button>
-              <span className="small" style={{marginLeft:'auto'}}>{isRendering ? 'Rendering…' : ''}</span>
+                <button onClick={() => loadAndRender(1)} disabled={disabled || page === 1}>⏮ First</button>
+                <button onClick={() => loadAndRender(page - 1)} disabled={disabled || page <= 1}>◀ Prev</button>
+                <span>Page&nbsp;</span>
+                <input
+                    type="number" min={1} max={total || 1}
+                    value={ page }
+                    onChange={ (e) => {
+                        const v = Number(e.target.value || 1)
+                        const t = clamped(v)
+                        if (t !== page) void loadAndRender(t)
+                    }}
+                />
+                <span>&nbsp;/ {total || '—'}</span>
+                <button onClick={() => loadAndRender(page + 1)} disabled={disabled || page >= total}>Next ▶</button>
+                <button onClick={() => loadAndRender(total)} disabled={disabled || page === total}>Last ⏭</button>
+                <span className="small" style={{marginLeft:'auto'}}>{isRendering ? 'Rendering…' : ''}</span>
             </div>
 
             <div className="canvasWrap" style={{ minHeight: dim ? `${dim.h}px` : '70vh' }}>
-              <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block' }} />
-              {isRendering && <div className="skeleton" />}
+                <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block' }} />
+                {isRendering && <div className="skeleton" />}
             </div>
 
-            {error && (
-              <div className="error">
-                <div>⚠️ {error}</div>
-                <button onClick={() => loadAndRender(page)}>Retry</button>
-              </div>
-            )}
+            {
+                error
+                && (
+                    <div className="error">
+                        <div>⚠️ {error}</div>
+                        <button onClick={() => loadAndRender(page)}>Retry</button>
+                    </div>
+                )
+            }
         </div>
     )
 }
