@@ -1,7 +1,7 @@
 export type Range = { start: number; end: number } | null;
 
 export function parseRange(rangeHeader: string | undefined, fileSize: number): Range {
-    console.log('utils/range.ts: parseRange(rangeHeader, fileSize)', rangeHeader, fileSize);
+    console.log('utils/range.parseRange(rangeHeader, fileSize)', rangeHeader, fileSize);
 
     if (!rangeHeader) return null;
 
@@ -11,8 +11,6 @@ export function parseRange(rangeHeader: string | undefined, fileSize: number): R
 
     let start = matches[1] === '' ? NaN : parseInt(matches[1], 10);
     let end = matches[2] === '' ? NaN : parseInt(matches[2], 10);
-
-    console.log('utils/range.ts: parseRange(rangeHeader, fileSize): start = ', start);
     console.log(`start = ${ start }`);
     console.log(`end = ${ end }`);
 
@@ -32,6 +30,6 @@ export function parseRange(rangeHeader: string | undefined, fileSize: number): R
 
     console.log(`start = ${ start }`);
     console.log(`end = ${ end }`);
-    
+
     return { start, end };
 }
