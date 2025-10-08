@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Large-PDF viewer</title>
+        <link rel="stylesheet" href="/css/styles.css" />
+        <!--
+            Load PDF.js from backend-served static path.
+            Instead, let the `/js/app.js` load the PDF library as an ESM module: `import * as pdfjsLib from '/static/pdfjs/pdf.min.mjs'`
+        -->
+        <!--
+        <script defer src="/static/pdfjs/pdf.min.mjs"></script>
+        <script defer src="/js/app.js"></script>
+        -->
+        <script type="module" src="/js/app-v2.js"></script>
+    </head>
+    <body>
+        <main class="container">
+            <header>
+                <h1>PDF Pager</h1>
+                <p class="sub">Large-PDF viewer (Loads one page at a time)</p>
+            </header>
+
+            <section id="controls" class="controls">
+                <button id="firstBtn" title="First page">⏮</button>
+                <button id="prevBtn" title="Previous page">◀</button>
+                <span>Page <input id="pageInput" type="number" min="1" value="1" /> / <span id="pageCount">?</span></span>
+                <button id="nextBtn" title="Next page">▶</button>
+                <button id="lastBtn" title="Last page">⏭</button>
+            </section>
+
+            <section class="canvas-wrap">
+                <canvas id="pdfCanvas"></canvas>
+            </section>
+
+            <footer>
+                <ul>
+                  <li><small>PDF Library: <code><a href="/static/pdfjs/pdf.worker.min.mjs">/static/pdfjs/pdf.min.mjs</a></code></small></li>
+                  <li><small>PDF Worker Library: <code><a href="/static/pdfjs/pdf.worker.min.mjs">/static/pdfjs/pdf.worker.min.mjs</a></code></small></li>
+                </ul>
+            </footer>
+        </main>
+    </body>
+</html>
