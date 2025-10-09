@@ -6,7 +6,7 @@ The system consists of a small Express server and a static browser UI powered by
 
 1. `GET /api/pdf/info`: Returns metadata and (if available) `pageCount` by parsing the PDF with `pdfjs-dist` in Node.
 2. `GET /api/pdf/stream`: Streams the PDF with **byte-range** support, proper **cache headers**, and **conditional requests**.
-3. `GET /api/pdf/page/<PAGE_NUMBER>?v=<etag>`: Uses the page number to retieve the page and the etag to bust caches when the source PDF changes.
+3. `GET /api/pdf/page/<PAGE_NUMBER>?v=<etag>`: Uses the page number to retrieve the page and the etag to bust caches when the source PDF changes.
 
 The browser uses PDF.js to fetch the PDF via `/api/pdf/stream` and renders one page at a time on a `<canvas>`.
 

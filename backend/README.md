@@ -5,7 +5,7 @@ A minimal backend + browser UI to load a large PDF via **byte-range** requests a
 - Backend: Node.js + Express + TypeScript
 - Range support: `/api/pdf/stream` handles `Range` requests and sets caching headers (`ETag`, `Cache-Control`, `Last-Modified`, `Accept-Ranges`).
 - JSON API: `/api/pdf/info` returns metadata (filename, size, last-modified, etag, page count when available).
-- Paging: Uses the page number to retieve the page and the etag to bust caches when the source PDF changes.
+- Paging: Uses the page number to retrieve the page and the etag to bust caches when the source PDF changes.
 - Frontend: Uses PDF.js in the browser to render individual pages with **first/prev/next/last** controls.
 - Config: `.env` (Dotenv) for `PORT` and `PDF_PATH`.
 
@@ -60,7 +60,7 @@ npm i pdf-lib
 
 - `GET /api/pdf/info` → JSON with `{ fileName, fileSize, lastModified, etag, pageCount }`
 - `GET /api/pdf/stream` → Serves the PDF with range support. Use `Range: bytes=...-...`. Responds `206 Partial Content` when appropriate.
-- `GET /api/pdf/page/<PAGE_NUMBER>?v=<etag>` → Uses the page number to retieve the page and the etag to bust caches when the source PDF changes.
+- `GET /api/pdf/page/<PAGE_NUMBER>?v=<etag>` → Uses the page number to retrieve the page and the etag to bust caches when the source PDF changes.
 
 **Caching & Conditionals**: 
 - Returns `ETag`, `Last-Modified`, and `Cache-Control: public, max-age=31536000, immutable`.
