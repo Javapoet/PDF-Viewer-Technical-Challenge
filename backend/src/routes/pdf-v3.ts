@@ -251,8 +251,15 @@ router.get('/page/:n', async (req, res) => {
     res.setHeader('Last-Modified', new Date(pdfInfo.lastModified).toUTCString());
 
     if (process.env.NODE_ENV === 'production') {
+
+        /*
+         * With Cache-Control: `public, max-age=31536000, immutable`, the browser just uses the cached copy and doesn’t revalidate — so you see no request (hence no 304).
+         * If you force reload, some browsers bypass cache entirely (still no 304).
+         */
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+
     } else {
+
         /*
          * no-store tells the browser do not cache at all, so it won’t send If-None-Match on the next request → you’ll always see 200.
          */
@@ -262,7 +269,8 @@ router.get('/page/:n', async (req, res) => {
          * Use no-cache (or max-age=0, must-revalidate)
          * no-cache tells the browser “you may cache, but always revalidate”, which triggers If-None-Match and gives you 304 when the ETag matches.
          */
-        res.setHeader('Cache-Control', 'no-cache');  
+        res.setHeader('Cache-Control', 'no-cache');
+        //or: res.setHeader('Cache-Control', 'max-age=0, must-revalidate');
     }
 
     res.setHeader('Content-Type', 'application/pdf');

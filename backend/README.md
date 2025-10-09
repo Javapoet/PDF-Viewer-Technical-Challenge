@@ -56,6 +56,19 @@ npm i pdf-lib
 
 ---
 
+## Testing Caching using curl
+
+### 1) Get the resource once and note the ETag header from the response
+```
+$ curl -i "http://localhost:3000/api/pdf/page/3?v=YOUR_ETAG"
+```
+### 2) Revalidate using If-None-Match
+```
+$ curl -i "http://localhost:3000/api/pdf/page/3?v=YOUR_ETAG" \
+     -H 'If-None-Match: W/"...hash..."-p3'
+```
+Expect: HTTP/1.1 304 Not Modified
+
 ## API
 
 - `GET /api/pdf/info` → JSON with `{ fileName, fileSize, lastModified, etag, pageCount }`
