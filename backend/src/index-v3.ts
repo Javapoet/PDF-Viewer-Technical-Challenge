@@ -32,7 +32,51 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 
-// Frontend
+/*
+ * Request timeout (e.g. 15s)
+ */
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS ?? 15000);
+console.log('index-v3.ts: REQUEST_TIMEOUT_MS = ', REQUEST_TIMEOUT_MS);
+
+app.use((req, res, next) => {
+    res.setTimeout(REQUEST_TIMEOUT_MS, () => {
+
+        if (!res.headersSent) res.status(504).json({ error: 'Request timed out', code: 'TIMEOUT' });
+    
+        // If a stream is mid-flight, destroy the socket
+        try { (res as any).socket?.destroy(); } catch {}
+    });
+    next();
+});
+
+/*
+ * Structured JSON logs (one line per request)
+ */
+app.use((req, res, next) => {
+    const t0 = process.hrtime.bigint();
+    const { method, originalUrl } = req;
+    res.on('finish', () => {
+        const dtMs = Number(process.hrtime.bigint() - t0) / 1e6;
+        const log = {
+            level: 'info',
+            ts: new Date().toISOString(),
+            msg: 'http_request',
+            method,
+            url: originalUrl,
+            status: res.statusCode,
+            duration_ms: Math.round(dtMs),
+            content_length: res.getHeader('Content-Length') ?? null,
+            user_agent: req.get('user-agent') ?? null,
+        };
+        console.log(JSON.stringify(log));
+    });
+    next();
+});
+
+
+/*
+ * Static frontend resources
+ */
 app.use('/', express.static(path.join(__dirname, '..', 'public')));
 
 /*

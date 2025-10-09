@@ -249,11 +249,22 @@ router.get('/page/:n', async (req, res) => {
     const pageEtag = `${pdfInfo.etag}-p${n}`;
     res.setHeader('ETag', pageEtag);
     res.setHeader('Last-Modified', new Date(pdfInfo.lastModified).toUTCString());
+
     if (process.env.NODE_ENV === 'production') {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
-        res.setHeader('Cache-Control', 'no-store');
+        /*
+         * no-store tells the browser do not cache at all, so it won’t send If-None-Match on the next request → you’ll always see 200.
+         */
+        //res.setHeader('Cache-Control', 'no-store');
+
+        /*
+         * Use no-cache (or max-age=0, must-revalidate)
+         * no-cache tells the browser “you may cache, but always revalidate”, which triggers If-None-Match and gives you 304 when the ETag matches.
+         */
+        res.setHeader('Cache-Control', 'no-cache');  
     }
+
     res.setHeader('Content-Type', 'application/pdf');
 
     const ifNoneMatch = req.headers['if-none-match'];
