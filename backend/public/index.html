@@ -17,27 +17,52 @@
     </head>
     <body>
         <main class="container">
+
             <header>
-                <h1>PDF Pager</h1>
-                <p class="sub">Large-PDF viewer (one page at a time)</p>
+                <h1>PDF Page Viewer</h1>
+                <p class="sub">Large-PDF viewer</p>
             </header>
 
-            <section id="controls" class="controls">
-                <button id="firstBtn" title="First page">⏮</button>
-                <button id="prevBtn" title="Previous page">◀</button>
-                <span>Page <input id="pageInput" type="number" min="1" value="1" /> / <span id="pageCount">?</span></span>
-                <button id="nextBtn" title="Next page">▶</button>
-                <button id="lastBtn" title="Last page">⏭</button>
-            </section>
-
-            <section class="canvas-wrap">
-                <canvas id="pdfCanvas"></canvas>
+            <section>
+                <ul>
+                    <li><a href="index-V1.html">index-V1.html</a> (Loads the entire PDF at once)</li>
+                    <li><a href="index-V2.html">index-V2.html</a> (Loads one page at a time but innefficiently and with no caching)</li>
+                    <li><a href="index-V3.html">index-V3.html</a> (Loads one page at a time but efficiently and with caching)</li>
+                </ul>
             </section>
 
             <footer>
+                <h2>PDF Libraries Used</h2>
+
+                <h3>pdf-lib</h3>
+                <p>
+                    <strong>pdf-lib</strong> lets the server slice the big document into tiny, cacheable, one-page PDFs → great TTFP and CDN hits.
+                </p>
                 <ul>
-                  <li><small>PDF Library: <code><a href="/static/pdfjs/pdf.worker.min.mjs">/static/pdfjs/pdf.min.mjs</a></code></small></li>
-                  <li><small>PDF Worker Library: <code><a href="/static/pdfjs/pdf.worker.min.mjs">/static/pdfjs/pdf.worker.min.mjs</a></code></small></li>
+                    <li><a href="https://pdf-lib.js.org/">https://pdf-lib.js.org/</a></li>
+                    <li><a href="https://www.npmjs.com/package/pdf-lib">https://www.npmjs.com/package/pdf-lib</a></li>
+                    <li><a href="https://github.com/Hopding/pdf-lib/">https://github.com/Hopding/pdf-lib/</a></li>
+                    <li>Manipulate/build PDFs (server-side tool).</li>
+                    <li>Compute pageCount.</li>
+                    <li>Extract a single page: copyPages → build a tiny one-page PDF for /api/pdf/page/:n.</li>
+                    <li>Output bytes you can cache by ETag and serve fast.</li>
+                    <li>Doesn’t render visuals; it edits/creates PDFs.</li>
+                </ul>
+
+                <h3>pdfjs-dist (PDF.js)</h3>
+                <p>
+                    <strong>pdfjs-dist</strong> lets the browser draw each of those pages smoothly without blocking the UI (thanks to its Web Worker).
+                </p>
+                <ul>
+                    <li><a href="https://mozilla.github.io/pdf.js/">https://mozilla.github.io/pdf.js/</a></li>
+                    <li><a href="https://www.npmjs.com/package/pdfjs-dist">https://www.npmjs.com/package/pdfjs-dist</a></li>
+                    <li><a href="https://github.com/mozilla/pdfjs-dist">https://github.com/mozilla/pdfjs-dist</a></li>
+                    <li>Render/view PDFs (browser viewer engine).</li>
+                    <li>Parse+render a PDF in the browser (worker thread) onto a &lt;canvas&gt;.</li>
+                    <li>We call pdfjsLib.getDocument({ url }) and then page.render(...).</li>
+                    <li>Doesn’t edit PDFs; it’s a viewer/renderer.</li>
+                    <li>PDF Library: <a href="/static/pdfjs/pdf.worker.min.mjs">/static/pdfjs/pdf.min.mjs</a></li>
+                    <li>PDF Worker Library: <a href="/static/pdfjs/pdf.worker.min.mjs">/static/pdfjs/pdf.worker.min.mjs</a></li>
                 </ul>
             </footer>
         </main>
