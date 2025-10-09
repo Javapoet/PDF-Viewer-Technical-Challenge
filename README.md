@@ -12,5 +12,5 @@ Your challenge is to design and build a minimal vertical slice that loads and pa
 
 ## Subprojects
 
-- React/Vite [Frontend](frontend/)
-- ExpressJs [Backend](backend/)
+- React / Vite [Frontend](frontend/)
+- Node.js / Express [Backend](backend/)
