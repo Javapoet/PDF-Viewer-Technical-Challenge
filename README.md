@@ -1,11 +1,8 @@
-# PDF-Viewer-Technical-Challenge
+# PDF Viewer Technical Challenge
 
 ## Challenge
 
- Your challenge is to design and build a minimal vertical slice that loads and paginates a large PDF fast and
- smoothly, with a backend that serves content efficiently on AWS and a frontend that renders pages without blocking
- the UI. You will propose, refine, plan a whole feature, and execute an initial functional release.
- Use React and Node/TypeScript to develop your solution and ensure your solution is self‑contained and easy to run
+Your challenge is to design and build a minimal vertical slice that loads and paginates a large PDF fast and smoothly, with a backend that serves content efficiently on AWS and a frontend that renders pages without blocking the UI. You will propose, refine, plan a whole feature, and execute an initial functional release. Use React and Node/TypeScript to develop your solution and ensure your solution is self‑contained and easy to run.
 
 ## Project Docs
 
@@ -15,5 +12,5 @@
 
 ## Subprojects
 
-- [Frontend/](frontend/)
-- [Backend/](backend/)
+- React/Vite [Frontend](frontend/)
+- ExpressJs [Backend](backend/)
