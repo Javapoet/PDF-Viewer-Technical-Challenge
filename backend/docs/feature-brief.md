@@ -1,4 +1,4 @@
-# Feature Brief
+# Feature Brief (Deliverable 0)
 
 Vertical Slice: Large-PDF Fast Pagination — Proposal & Plan
 
@@ -49,7 +49,7 @@ Upload UI, document library, full-text search, annotations, server-side thumbnai
 
 2) Architecture overview
 
-Frontend approach
+## Frontend approach
 
 - PDF.js (ESM) with Worker: Use pdfjs-dist ESM build; module worker for parsing/raster off the main thread.
 - Single <canvas> viewport (virtualized: render one page at a time).
@@ -63,7 +63,7 @@ Frontend approach
 - Error UX: Toast/banner with retriable states (offline, 404, 5xx).
 - Observability (lightweight): console timings for TTFP and per-page render; log to backend later (vNext).
 
-Backend approach
+## Backend approach
 
 - Hybrid, page-centric delivery (chosen for the slice):
   - Per-page endpoint — GET /api/pdf/page/:n
