@@ -3,7 +3,8 @@ Infra
 
 Docker + Compose configs for running the backend API and React (Vite) frontend locally and as a single production-style container.
 
-Folder layout
+## Folder layout
+```
 repo-root/
 ├─ backend/
 ├─ frontend/
@@ -11,7 +12,7 @@ repo-root/
 │  ├─ Dockerfile
 │  └─ docker-compose.yml
 └─ .dockerignore
-
+```
 
 - `infra/Dockerfile`: multi-stage build that compiles the frontend and backend and serves both from one Node container.
 
@@ -48,7 +49,6 @@ S3_REGION=us-east-1
 S3_BUCKET=dermot-dev
 S3_KEY=IRS-Federal-Income-Tax-Guide-2024-Publication-17.pdf
 ```
-
 
 **Auth**: either mount your AWS profile directory into the container or pass env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, optional `AWS_SESSION_TOKEN`).
 
