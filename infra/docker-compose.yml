@@ -1,0 +1,80 @@
+# infra/docker-compose.yml
+name: pdf-pager
+
+services:
+  # =======================
+  # Development profile
+  # =======================
+  backend:
+    profiles: ["dev"]
+    image: node:22-alpine
+    working_dir: /app/backend
+    command: sh -c "npm ci && npm run dev"
+    environment:
+      NODE_ENV: development
+      # Choose storage
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      # Local mode
+      PDF_PATH: ${PDF_PATH:-/app/backend/assets/IRS-Federal-Income-Tax-Guide-2024-Publication-17.pdf}
+      # S3 mode (optional — set these to use S3 in dev)
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_KEY: ${S3_KEY:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../backend:/app/backend:rw
+      - backend_node_modules:/app/backend/node_modules
+      # Mount AWS creds if you use S3 in dev
+      # Windows PowerShell/CMD (uncomment the next line):
+      # - "${USERPROFILE}\\.aws:/root/.aws:ro"
+      # macOS/Linux/WSL (uncomment the next line):
+      # - "${HOME}/.aws:/root/.aws:ro"
+
+  frontend:
+    profiles: ["dev"]
+    image: node:22-alpine
+    working_dir: /app/frontend
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      NODE_ENV: development
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../frontend:/app/frontend:rw
+      - frontend_node_modules:/app/frontend/node_modules
+    depends_on:
+      - backend
+
+  # =======================
+  # Production profile
+  # =======================
+  app:
+    profiles: ["prod"]
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    image: pdf-pager:latest
+    environment:
+      NODE_ENV: production
+      # Choose storage
+      STORAGE_MODE: ${STORAGE_MODE:-local}
+      # Local mode
+      PDF_PATH: ${PDF_PATH:-/app/backend/assets/IRS-Federal-Income-Tax-Guide-2024-Publication-17.pdf}
+      # S3 mode
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_KEY: ${S3_KEY:-}
+    ports:
+      - "3000:3000"
+    # Mount AWS creds if you use S3 in prod from your laptop
+    # Windows:
+    # volumes:
+    #   - "${USERPROFILE}\\.aws:/root/.aws:ro"
+    # macOS/Linux/WSL:
+    # volumes:
+    #   - "${HOME}/.aws:/root/.aws:ro"
+
+volumes:
+  backend_node_modules:
+  frontend_node_modules:

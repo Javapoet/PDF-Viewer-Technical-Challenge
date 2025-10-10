@@ -82,6 +82,8 @@ class LeastRecentlyUsedCache<V> {
         if (this.map.size > this.max) this.map.delete(this.map.keys().next().value);
     }
 }
+
+//const pageCache = new Map<string, Buffer>();
 const pageCache = new LeastRecentlyUsedCache<Buffer>(64);
 const inflightPages = new Map<string, Promise<Buffer>>(); // De-dup in-flight page builds
 
@@ -109,8 +111,6 @@ let pdfInfo: PdfInfo = {
     pageCount: null,
 };
 console.log('routes/pdf.ts: pdfInfo = ', pdfInfo);
-
-//const pageCache = new Map<string, Buffer>();
 
 /*
  * Make the S3 etag look like our weak ETag format (W/"...") so front-end versioning stays consistent.

@@ -14,3 +14,7 @@ Your challenge is to design and build a minimal vertical slice that loads and pa
 
 - React / Vite [Frontend](frontend/)
 - Node.js / Express [Backend](backend/)
+
+## Docker
+
+- [Infra (Docker & Compose)](infra/README.md)

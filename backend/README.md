@@ -19,9 +19,9 @@ A minimal backend + browser UI to load a large PDF via **byte-range** requests a
    npm i -D @types/morgan
    ```
 
-1.1 **Install pdf-lib**
+  1.1. **Install pdf-lib**
    ```bash
-npm i pdf-lib
+   npm i pdf-lib
    ```
 
 2. **Set environment variables** (optional)
