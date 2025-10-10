@@ -1,4 +1,4 @@
-console.log('routes/pdf-v3.ts');
+console.log('routes/pdf-v4.ts');
 
 import express from 'express';
 import fs from 'fs';
@@ -7,6 +7,54 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { parseRange } from '../utils/range.js';
 import { PDFDocument } from 'pdf-lib';
+import { S3Client, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+//import type { Storage, SourceMetadata } from '../storage/types.js';
+//import { LocalStorage } from '../storage/local.js';
+//import { S3Storage } from '../storage/s3.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+console.log('routes/pdf-v4.ts: __filename = ', __filename);
+console.log('routes/pdf-v4.ts: __dirname = ', __dirname);
+
+const PDF_NAME = 'IRS-Federal-Income-Tax-Guide-2024-Publication-17.pdf';
+const PDF_PATH = process.env.PDF_PATH || path.join(__dirname, '..', '..', 'assets', PDF_NAME);
+console.log('routes/pdf-v4.ts: PDF_PATH = ', PDF_PATH);
+
+/*
+ * Pick storage mode
+ */
+const STORAGE_MODE = (process.env.STORAGE_MODE || 'local').toLowerCase();
+
+/*
+let storage: Storage;
+if (STORAGE_MODE === 's3') {
+    const region = process.env.S3_REGION || 'us-east-1';
+    const bucket = process.env.S3_BUCKET || '';
+    const key = process.env.S3_KEY || '';
+    const endpoint = process.env.S3_ENDPOINT;
+    const fps = /^true$/i.test(process.env.S3_FORCE_PATH_STYLE || '');
+    if (!bucket || !key) {
+        throw new Error('S3 mode requires S3_BUCKET and S3_KEY');
+    }
+    storage = new S3Storage(region, bucket, key, endpoint, fps);
+} else {
+    //const PDF_PATH = process.env.PDF_PATH || path.join(__dirname, '..', '..', 'assets', 'sample.pdf');
+    storage = new LocalStorage(path.resolve(PDF_PATH));
+}
+*/
+
+/*
+ * Create the S3 client
+ */
+const s3 =
+    STORAGE_MODE === 's3'
+    ? new S3Client({
+        region: process.env.S3_REGION || 'us-east-1',
+        endpoint: process.env.S3_ENDPOINT || undefined,             // optional for S3-compatible
+        forcePathStyle: /^true$/i.test(process.env.S3_FORCE_PATH_STYLE || ''), // optional for S3-compatible
+      })
+    : null;
 
 /*
  * Create a Least Recently Used (LRU) cache for stor
@@ -37,17 +85,7 @@ class LeastRecentlyUsedCache<V> {
 const pageCache = new LeastRecentlyUsedCache<Buffer>(64);
 const inflightPages = new Map<string, Promise<Buffer>>(); // De-dup in-flight page builds
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-console.log('routes/pdf-v3.ts: __filename = ', __filename);
-console.log('routes/pdf-v3.ts: __dirname = ', __dirname);
-
 const router = express.Router();
-
-const PDF_NAME = 'IRS-Federal-Income-Tax-Guide-2024-Publication-17.pdf';
-const PDF_PATH = process.env.PDF_PATH || path.join(__dirname, '..', '..', 'assets', PDF_NAME);
-console.log('routes/pdf-v3.ts: PDF_PATH = ', PDF_PATH);
 
 type PdfInfo = {
     filePath: string;
@@ -57,6 +95,10 @@ type PdfInfo = {
     etag: string;
     pageCount: number | null;
 };
+//type PdfInfo = SourceMetadata & { pageCount: number | null };
+
+//let meta: SourceMetadata;
+//let pageCount: number | null = null;
 
 let pdfInfo: PdfInfo = {
     filePath: path.resolve(PDF_PATH),
@@ -70,21 +112,100 @@ console.log('routes/pdf.ts: pdfInfo = ', pdfInfo);
 
 //const pageCache = new Map<string, Buffer>();
 
+/*
+ * Make the S3 etag look like our weak ETag format (W/"...") so front-end versioning stays consistent.
+ */
+function normalizeS3Etag(etag) {
+    if (!etag) return '';
+    const trimmed = String(etag).trim();
+    const quoted = trimmed.startsWith('"') ? trimmed : `"${trimmed}"`;
+    return `W/${quoted}`;
+}
+
+/*
+ * Read (in chunks) an S3 Body stream into a Buffer.
+ */
+async function streamToBuffer(body) {
+    const chunks = [];
+    for await (const chunk of body) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+}
+
+/**
+ * Initialize pdfInfo and warm caches.
+ * - In LOCAL mode: stat file, compute SHA1 etag, read bytes once.
+ * - In S3 mode: HeadObject for size/lastModified/etag, then GetObject once to cache bytes.
+ * - Compute pageCount once (from cached bytes).
+ * - Warm page 1 (build single-page PDF and memoize).
+ */
 export async function initPdfInfo() {
-    console.log('routes/pdf-v3.initPdfInfo()');
+    console.log('routes/pdf-v4.initPdfInfo()');
 
-    const stat = fs.statSync(pdfInfo.filePath);
-    pdfInfo.fileSize = stat.size;
-    pdfInfo.lastModified = stat.mtimeMs;
-    pdfInfo.etag = await computeEtag(pdfInfo.filePath);
-    console.log('routes/pdf-v3.initPdfInfo(): pdfInfo.etag = ', pdfInfo.etag);
+    console.log('STORAGE_MODE = ', STORAGE_MODE);
 
-    // Compute pageCount once
+    if (STORAGE_MODE === 's3') {
+
+        console.info('Load the source file from AWS S3 storage');
+
+        // S3 metadata
+        const Bucket = process.env.S3_BUCKET;
+        const Key = process.env.S3_KEY;
+        if (!Bucket || !Key) throw new Error('S3 mode requires S3_BUCKET and S3_KEY');
+
+        const head = await s3.send(new HeadObjectCommand({ Bucket, Key }));
+        pdfInfo.fileName = path.basename(Key);
+        pdfInfo.fileSize = head.ContentLength ?? 0;
+        pdfInfo.lastModified = head.LastModified ? head.LastModified.getTime() : Date.now();
+        pdfInfo.etag = normalizeS3Etag(head.ETag);
+
+        console.log('pdfInfo = ', pdfInfo);
+
+        // S3 bytes (read once per ETag and cache)
+        //if (!bufferCache.has(pdfInfo.etag)) {
+        if (!srcBytesCache?.etag) {
+            const out = await s3.send(new GetObjectCommand({ Bucket, Key }));
+            const buf = await streamToBuffer(out.Body);
+            //bufferCache.set(pdfInfo.etag, buf);
+            srcBytesCache = { etag: pdfInfo.etag, buf };
+            console.log('srcBytesCache = ', srcBytesCache);
+            console.log('srcBytesCache.etag = ', srcBytesCache.etag);
+            console.log('srcBytesCache.buf.length = ', srcBytesCache.buf.length);
+        }
+
+    } else {
+
+        console.info('Load the source file from the local file system storage');
+
+        // Local metadata
+        const stat = fs.statSync(pdfInfo.filePath);
+        pdfInfo.fileName = path.basename(pdfInfo.filePath);
+        pdfInfo.fileSize = stat.size;
+        pdfInfo.lastModified = stat.mtimeMs;
+        pdfInfo.etag = await computeEtag(pdfInfo.filePath); // returns W/"<sha1>"
+        console.log('routes/pdf-v4.initPdfInfo(): pdfInfo.etag = ', pdfInfo.etag);
+
+        // LOCAL bytes (read once per ETag and cache)
+        //if (!bufferCache.has(pdfInfo.etag)) {
+        if (!srcBytesCache?.etag) {
+            const buf = fs.readFileSync(pdfInfo.filePath);
+            //bufferCache.set(pdfInfo.etag, buf);
+            srcBytesCache = { etag: pdfInfo.etag, buf };
+            console.log('srcBytesCache = ', srcBytesCache);
+            console.log('srcBytesCache.etag = ', srcBytesCache.etag);
+            console.log('srcBytesCache.buf.length = ', srcBytesCache.buf.length);
+        }
+    }
+
+    /*
+     * Compute pageCount once
+     */
     try {
-        const doc = await getSourceDoc();
-        console.log('routes/pdf-v3.initPdfInfo(): doc = ', typeof doc);
-        pdfInfo.pageCount = doc.getPageCount();
-        console.log('routes/pdf-v3.initPdfInfo(): pdfInfo.pageCount = ', pdfInfo.pageCount);
+        const sourceDoc = await getSourceDoc();
+        console.log('routes/pdf-v4.initPdfInfo(): sourceDoc = ', typeof sourceDoc);
+        pdfInfo.pageCount = sourceDoc.getPageCount();
+        console.log('routes/pdf-v4.initPdfInfo(): pdfInfo.pageCount = ', pdfInfo.pageCount);
     } catch {
         pdfInfo.pageCount = null;
     }
@@ -92,7 +213,7 @@ export async function initPdfInfo() {
     // 🔥 Warm page 1 for instant TTFP (best-effort)
     if (pdfInfo.pageCount && pdfInfo.pageCount > 0) {
         const key = `${pdfInfo.etag}|1`;
-        console.log('routes/pdf-v3.initPdfInfo(): key = ', key);
+        console.log('routes/pdf-v4.initPdfInfo(): key = ', key);
         if (!pageCache.get(key)) {
             void buildSinglePagePdf(1).then((buf) => pageCache.set(key, buf)).catch(() => {});
         }
@@ -100,7 +221,7 @@ export async function initPdfInfo() {
 }
 
 async function buildSinglePagePdf(n: number): Promise<Buffer> {
-    console.log('routes/pdf-v3.buildSinglePagePdf(' + n + ')');
+    console.log('routes/pdf-v4.buildSinglePagePdf(' + n + ')');
 
     const key = `${pdfInfo.etag}|${n}`;
     console.log('key = ', key);
@@ -140,9 +261,8 @@ async function buildSinglePagePdf(n: number): Promise<Buffer> {
     }
 }
 
-
 async function computeEtag(filePath: string): Promise<string> {
-    console.log('routes/pdf-v3.computeEtag(filePath)', filePath);
+    console.log('routes/pdf-v4.computeEtag(filePath)', filePath);
     const hash = crypto.createHash('sha1');
     const stream = fs.createReadStream(filePath);
     return await new Promise((resolve, reject) => {
@@ -152,8 +272,12 @@ async function computeEtag(filePath: string): Promise<string> {
     });
 }
 
+/*
+ * Return the source document bytes from the cache.
+ * If the source bytes are not in the cache, load them from dick and add them to the cache.
+ */
 async function getSourceBytes(): Promise<Buffer> {
-    console.log('routes/pdf-v3.getSourceBytes()');
+    console.log('routes/pdf-v4.getSourceBytes()');
 
     if (srcBytesCache?.etag === pdfInfo.etag && srcBytesCache.buf) {
         console.info('Return the source bytes from the `srcBytesCache`');
@@ -166,8 +290,12 @@ async function getSourceBytes(): Promise<Buffer> {
     return buf;
 }
 
+/*
+ * Return the `PDFDocument` from the cache.
+ * If the source doc is not in the cache, get it by calling `getSourceBytes()`.
+ */
 async function getSourceDoc(): Promise<PDFDocument> {
-    console.log('routes/pdf-v3.getSourceDoc()');
+    console.log('routes/pdf-v4.getSourceDoc()');
 
     if (srcDocCache?.etag === pdfInfo.etag && srcDocCache.doc) {
         console.info('Return the source doc from the `srcDocCache`');
@@ -182,8 +310,9 @@ async function getSourceDoc(): Promise<PDFDocument> {
     return doc;
 }
 
+/* Removed for now
 async function ensurePageCount(): Promise<number | null> {
-    console.log('routes/pdf-v3.ensurePageCount()');
+    console.log('routes/pdf-v4.ensurePageCount()');
 
     if (pdfInfo.pageCount != null) {
         console.log('pdfInfo.pageCount = ', pdfInfo.pageCount);
@@ -197,19 +326,20 @@ async function ensurePageCount(): Promise<number | null> {
         console.log('doc = ', doc);
         pdfInfo.pageCount = doc.getPageCount();
         console.log('pdfInfo.pageCount = ', pdfInfo.pageCount);
-        console.log('routes/pdf-v3.ensurePageCount(): return ' + pdfInfo.pageCount);
+        console.log('routes/pdf-v4.ensurePageCount(): return ' + pdfInfo.pageCount);
         return pdfInfo.pageCount;
     } catch (err) {
         console.error('Failed to read PDF page count with pdf-lib:', err);
         pdfInfo.pageCount = null;
-        console.log('routes/pdf-v3.ensurePageCount(): return null');
+        console.log('routes/pdf-v4.ensurePageCount(): return null');
         return null;
     }
 }
+*/
 
 router.get('/info', async (_req, res) => {
-    //console.log('routes/pdf-v3.ts: router.get(\'/info\', (_req, res)');
-    console.log('routes/pdf-v3.info(_req, res)');
+    //console.log('routes/pdf-v4.ts: router.get(\'/info\', (_req, res)');
+    console.log('routes/pdf-v4.info(_req, res)');
 
     if (!fs.existsSync(pdfInfo.filePath)) return res.status(404).json({ error: 'PDF not found' });
     
@@ -225,8 +355,8 @@ router.get('/info', async (_req, res) => {
 });
 
 router.get('/page/:n', async (req, res) => {
-    //console.log('routes/pdf-v3.ts: router.get(\'/page/:n\', (_req, res)');
-    console.log('routes/pdf-v3.page(_req, res)', req.params.n);
+    //console.log('routes/pdf-v4.ts: router.get(\'/page/:n\', (_req, res)');
+    console.log('routes/pdf-v4.page(_req, res)', req.params.n);
 
     if (!fs.existsSync(pdfInfo.filePath)) return res.status(404).json({ error: 'PDF not found' });
 
@@ -261,13 +391,13 @@ router.get('/page/:n', async (req, res) => {
     } else {
 
         /*
-         * no-store tells the browser do not cache at all, so it won’t send If-None-Match on the next request → you’ll always see 200.
+         * `no-store` tells the browser do not cache at all, so it won’t send If-None-Match on the next request → you’ll always see 200.
          */
         //res.setHeader('Cache-Control', 'no-store');
 
         /*
-         * Use no-cache (or max-age=0, must-revalidate)
-         * no-cache tells the browser “you may cache, but always revalidate”, which triggers If-None-Match and gives you 304 when the ETag matches.
+         * Use `no-cache` (or max-age=0, must-revalidate)
+         * `no-cache`` tells the browser “you may cache, but always revalidate”, which triggers If-None-Match and gives you 304 when the ETag matches.
          */
         res.setHeader('Cache-Control', 'no-cache');
         //or: res.setHeader('Cache-Control', 'max-age=0, must-revalidate');
@@ -276,7 +406,6 @@ router.get('/page/:n', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
 
     const ifNoneMatch = req.headers['if-none-match'];
-    //if (ifNoneMatch && ifNoneMatch === pageEtag) {
     if (ifNoneMatch) {
         console.log('ifNoneMatch = ', ifNoneMatch);
         console.log('pageEtag    = ', pageEtag);
