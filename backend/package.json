@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index-v3.ts",
+    "dev": "tsx watch src/index-v4.ts",
     "dev-v1": "tsx watch src/index-v1.ts",
     "dev-v2": "tsx watch src/index-v2.ts",
     "dev-v3": "tsx watch src/index-v3.ts",
+    "dev-v4": "tsx watch src/index-v4.ts",
     "build": "tsc",
-    "start": "node dist/index-v3.js"
+    "start": "node dist/index-v4.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -17,7 +18,8 @@
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^4.8.69"
+    "pdfjs-dist": "^4.8.69",
+    "@aws-sdk/client-s3": "^3.670.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
